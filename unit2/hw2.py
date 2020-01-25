@@ -1,8 +1,8 @@
 #################################################
 # hw2.py
 #
-# Your name:
-# Your andrew id:
+# Your name: Clara Ye
+# Your andrew id: zixuany
 #################################################
 
 import cs112_s20_unit2_linter
@@ -78,13 +78,15 @@ def mostFrequentDigit(n):
     n = abs(n)
     maxFrequency = -1
     mostFrequent = None
+    # count the frequency of each digit 0-9:
     for digit in range(10):
         count = 0
         number = n
-        while number > 0:
+        while (number > 0):
             if ((number % 10) == digit):
                 count += 1
             number //= 10
+        # update variables when needed:
         if (count > maxFrequency):
             maxFrequency = count
             mostFrequent = digit
@@ -107,9 +109,9 @@ def isPrime(n):
 def digitCount(n):
     n = abs(n)
     count = 1
-    while (n > 10):
-        n //= 10
+    while (n >= 10):
         count += 1
+        n //= 10
     return count
 
 def getKthDigit(n, k):
@@ -123,7 +125,7 @@ def isPalindromic(n):
         digit = 0
         totalDigits = digitCount(n)
         # need to check until the middle of the number:
-        for digit in range(math.ceil(totalDigits / 2)):
+        for digit in range(totalDigits // 2):
             firstDigit = getKthDigit(n, digit)
             lastDigit = getKthDigit(n, (totalDigits - digit - 1))
             if (firstDigit != lastDigit):
@@ -132,13 +134,12 @@ def isPalindromic(n):
         return True
 
 def nthPalindromicPrime(n):
-    guess = 0
+    guess = 2
     count = 0
-    while (count <= n):
+    while (count < n):
         guess += 1
-        if isPrime(guess):
-            if isPalindromic(guess):
-                count += 1
+        if isPrime(guess) and isPalindromic(guess):
+            count += 1
     return guess
 
 def carrylessAdd(x, y):
@@ -228,7 +229,7 @@ def findZeroWithBisection(f, x0, x1, epsilon):
     if (f(x0) * f(x1) > 0):
         return None
     xMid = (x0 + x1) / 2
-    while almostEqual(f(xMid), 0, epsilon) == False:
+    while (almostEqual(f(xMid), 0, epsilon) == False):
         # check the half with change of sign in the next loop:
         if (f(x0) * f(xMid) < 0):
             x1 = xMid
@@ -447,6 +448,8 @@ def lengthEncode(n):
     code = intCat(sign, code)
     return code
 
+# takes an encoded value,
+# returns its prefix (sign, count-count, count):
 def getPrefix(n):
     length = digitCount(n)
     sign = getKthDigit(n, (length - 1))
@@ -554,6 +557,7 @@ def newIntSet():
     return lengthEncode(0)
 
 def intSetAdd(s, v):
+    # only adds if v is not already in s:
     if intSetContains(s, v):
         return s
     else:
@@ -561,13 +565,16 @@ def intSetAdd(s, v):
         return newS
 
 def intSetContains(s, v):
-    vCode = lengthEncode(v)
-    (setLengthCode, rest) = getLeftmostCode(s)
-    while (rest != 0):
-        (toCheck, rest) = getLeftmostCode(rest)
-        if (toCheck == vCode):
-            return True
-    return False
+    if (digitCount(s) < 4):
+        return False
+    else:
+        vCode = lengthEncode(v)
+        (setLengthCode, rest) = getLeftmostCode(s)
+        while (rest != 0):
+            (toCheck, rest) = getLeftmostCode(rest)
+            if (toCheck == vCode):
+                return True
+        return False
 
 def newIntMap():
     return lengthEncode(0)
@@ -575,8 +582,10 @@ def newIntMap():
 def intMapContains(m, key):
     return intSetContains(m, key)
 
-def intMapFind(m, element):
-    code = lengthEncode(element)
+# looks for a key in a map,
+# returns everything that follows it:
+def intMapFind(m, key):
+    code = lengthEncode(key)
     (mapLengthCode, rest) = getLeftmostCode(m)
     mapLength = lengthDecode(mapLengthCode)
     while (rest != 0):
@@ -593,20 +602,27 @@ def intMapGet(m, key):
         return "no such key"
 
 def intMapSet(m, key, value):
+    # if the key already exists, replace its value:
     if intMapContains(m, key):
+        # breaks the map down into 3 pieces:
+        # what to replace, what's on its left, and what's on its right:
         rest = intMapFind(m, key)
         left = m // (10 ** digitCount(rest)) 
         (toReplace, right) = getLeftmostCode(rest)
+        # replace the value:
         valueCode = lengthEncode(value)
         newMap = intCat(left, valueCode)
+        # if there is nothing on the right, avoids adding an extra 0:
         if (right != 0):
             newMap = intCat(newMap, right)
+    # if the key is not in the map, create the new key-value pair:
     else:
         newMap = intListAppend(m, key)
         newMap = intListAppend(newMap, value)
     return newMap
 
 def newIntFSM():
+    # an FSM consists of a map of transitions and a set of accepting states:
     emptyList = newIntList()
     emptyMap = newIntMap()
     emptySet = newIntSet()
@@ -614,7 +630,7 @@ def newIntFSM():
     fsm = intListAppend(fsm, emptySet)
     return fsm
 
-# splits a fsm into a map and a set
+# splits a fsm into a map and a set:
 def intFSMSplit(fsm):
     (lengthCode, rest) = getLeftmostCode(fsm)
     (stateMapCode, stateSetCode) = getLeftmostCode(rest)
@@ -641,18 +657,15 @@ def setTransition(fsm, fromState, digit, toState):
     # get the decoded map:
     (lengthCode, stateMapCode, stateSetCode) = intFSMSplit(fsm)
     stateMap = lengthDecode(stateMapCode)
-    # add the transition to the map:
-    newInnerMap = intMapSet(newIntMap(), digit, toState)
     # if the start state is already in the map,
-    # turn the value to a list of the existing inner map and the new inner map:
+    # add the pair to the inner map:
+    innerMap = intMapSet(newIntMap(), digit, toState)
     if intMapContains(stateMap, fromState):
-        existingInnerMap = intMapGet(stateMap, fromState)
-        innerMapList = intListAppend(newIntList(), existingInnerMap)
-        innerMapList = intListAppend(innerMapList, newInnerMap)
-        outerMap = intMapSet(stateMap, fromState, innerMapList)
-    # otherwise make a new map
+        innerMap = intMapSet(innerMap, digit, toState)
+        outerMap = intListAppend(stateMap, innerMap)
+    # otherwise add the new inner map directly:
     else:
-        outerMap = intMapSet(stateMap, fromState, newInnerMap)
+        outerMap = intMapSet(stateMap, fromState, innerMap)
     newStateMapCode = lengthEncode(outerMap)
     # add all pieces together:
     newFSM = intCat(lengthCode, newStateMapCode)
@@ -660,25 +673,21 @@ def setTransition(fsm, fromState, digit, toState):
     return newFSM
 
 def getTransition(fsm, fromState, digit):
+    # get the outer map:
     (lengthCode, stateMapCode, stateSetCode) = intFSMSplit(fsm)
-    stateMap = lengthDecode(stateMapCode)
-    if intMapContains(stateMap, fromState):
-        innerMap = intMapGet(stateMap, fromState)
-        # if innerMap has 12 digits,
-        # it is a regular inner map:
-        if (digitCount(innerMap) == 12):
+    outerMap = lengthDecode(stateMapCode)
+    # look for the from-state in the outer map:
+    if intMapContains(outerMap, fromState):
+        innerMapCode = intMapFind(outerMap, fromState)
+        # look for the symbol in the inner map,
+        # checking each symbol-toState pair:
+        while (innerMapCode > 0):
+            (toCheck, innerMapCode) = getLeftmostCode(innerMapCode)
+            innerMap = lengthDecode(toCheck)
             if intMapContains(innerMap, digit):
-                toState = intMapGet(innerMap, digit)
+                toStateCode = intMapFind(innerMap, digit)
+                toState = lengthDecode(toStateCode)
                 return toState
-        # otherwise it is a list of inner maps:
-        else:
-            (listLength, rest) = getLeftmostCode(innerMap)
-            while (rest != 0):
-                (innerMapCode, rest) = getLeftmostCode(rest)
-                innerMap = lengthDecode(innerMapCode)
-                if intMapContains(innerMap, digit):
-                    toState = intMapGet(innerMap, digit)
-                    return toState
     return "no such transition"
 
 def accepts(fsm, inputValue):
@@ -687,14 +696,18 @@ def accepts(fsm, inputValue):
     while (digit >= 0):
         symbol = getKthDigit(inputValue, digit)
         toState = getTransition(fsm, fromState, symbol)
+        # returns false if the to-state is not an integer,
+        # i.e., getTransition() returns "no such transition":
         if (isinstance(toState, int) == False):
             return False
+        # otherwise move on to the next transition:
         else:
             fromState = toState
             digit -= 1
     return isAcceptingState(fsm, fromState)
 
 def states(fsm, inputValue):
+    # same as accepts(), excepts keeping track of all the transitions:
     visited = intListAppend(newIntList(), 1)
     digit = digitCount(inputValue) - 1
     fromState = 1
