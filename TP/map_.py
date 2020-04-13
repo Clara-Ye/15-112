@@ -7,9 +7,8 @@
 
 from cmu_112_graphics import *
 
-# from https://www.cs.cmu.edu/~112/notes/notes-data-and-operations.html#FloatingPointApprox
-def almostEqual(d1, d2):
-    epsilon = 10**-10
+# slightly adapted from https://www.cs.cmu.edu/~112/notes/notes-data-and-operations.html#FloatingPointApprox
+def almostEqual(d1, d2, epsilon = 10**-10):
     return (abs(d2 - d1) < epsilon)
 
 class Location(object):
@@ -135,18 +134,23 @@ class MapMode(Mode):
     mode.background = mode.loadImage('images\mapPic.png')
     scale = min(mode.width/mode.background.size[0], mode.height/mode.background.size[1])
     mode.background = mode.scaleImage(mode.background, scale)
+    
     mode.r = mode.width/100
     mode.iconWidth = mode.width/37.5
     (mode.dormIconX, mode.dormIconY) = (mode.width*4/75, mode.height*4/55)
     (mode.scheIconX, mode.scheIconY) = (mode.width*10/75, mode.height*4/55)
     (mode.filtIconX, mode.filtIconY) = (mode.width*71/75, mode.height*4/55)
+    
     mode.target = None
     mode.displayPaths = False
     mode.nodesSelected = [mode.app.hero.location]
     mode.recommendedPath = []
     (mode.recPathX1, mode.recPathX2, mode.recPathY1, mode.recPathY2) = (-1, -1, -1, -1)
     (mode.cusPathX1, mode.cusPathX2, mode.cusPathY1, mode.cusPathY2) = (-1, -1, -1, -1)
+    
     mode.path = []
+    (mode.heroDx, mode.heroDy) = (0, 0)
+    mode.heroMoving = False
 
   def mousePressed(mode, event):
     print(f"Mouse pressed at ({event.x}, {event.y}).")
@@ -163,7 +167,10 @@ class MapMode(Mode):
       # would work like tiles
       pass
     elif (mode.mousePressedOnBuilding(event)): pass
-    elif (mode.mousePressedOnPathIcons(event)): moveHero(mode)
+    elif (mode.mousePressedOnPathIcons(event)):
+      mode.recommendedPath = []
+      mode.nodesSelected = []
+      mode.heroMoving = True
   
   def mousePressedOnBuilding(mode, event):
     for building in mode.app.graph:
@@ -230,10 +237,25 @@ class MapMode(Mode):
         mode.nodesSelected = [mode.app.hero.location]
     return False
 
-  def moveHero(mode):
-    for i in range(len(mode.path)-1):
-
-    pass
+  def getHeroMovement(mode):
+    (node1, node2) = (mode.path[0], mode.path[1])
+    x = node2.coordinates[0] - node1.coordinates[0]
+    y = node2.coordinates[1] - node1.coordinates[1]
+    h = (x**2 + y**2)**0.5
+    (mode.heroDx, mode.heroDy) = (mode.app.hero.speed*x/h, mode.app.hero.speed*y/h)
+  
+  def timerFired(mode):
+    if (len(mode.path) > 1):
+      mode.getHeroMovement()
+      newHeroX = mode.app.hero.coordinates[0] + mode.heroDx
+      newHeroY = mode.app.hero.coordinates[1] + mode.heroDy
+      mode.app.hero.coordinates = (newHeroX, newHeroY)
+      if (almostEqual(mode.app.hero.coordinates[0], mode.path[1].coordinates[0], 0.8) and
+          almostEqual(mode.app.hero.coordinates[1], mode.path[1].coordinates[1], 0.8)):
+        mode.path.pop(0)
+    elif (len(mode.path) == 1): 
+      mode.path = []
+      mode.heroMoving = False
 
   def redrawAll(mode, canvas):
     canvas.create_image(mode.width/2, mode.height/2, 
@@ -254,11 +276,12 @@ class MapMode(Mode):
     mode.drawIcons(canvas)
 
   def drawPaths(mode, canvas):
-    for nodeA in mode.app.graph:
-      (x1, y1) = nodeA.coordinates
-      for nodeB in mode.app.graph[nodeA]:
-        (x2, y2) = nodeB.coordinates
-        canvas.create_line(x1, y1, x2, y2, width = 10, fill = "blue")
+    if not mode.heroMoving:
+      for nodeA in mode.app.graph:
+        (x1, y1) = nodeA.coordinates
+        for nodeB in mode.app.graph[nodeA]:
+          (x2, y2) = nodeB.coordinates
+          canvas.create_line(x1, y1, x2, y2, width = 10, fill = "blue")
     # draw recommended path:
     for i in range(len(mode.recommendedPath)-1):
       (x1, y1) = mode.recommendedPath[i].coordinates
@@ -269,6 +292,11 @@ class MapMode(Mode):
       (x1, y1) = mode.nodesSelected[i].coordinates
       (x2, y2) = mode.nodesSelected[i+1].coordinates
       canvas.create_line(x1, y1, x2, y2, width = 10, fill = "red")
+    # draw the ongoing path:
+    for i in range(len(mode.path)-1):
+      (x1, y1) = mode.path[i].coordinates
+      (x2, y2) = mode.path[i+1].coordinates
+      canvas.create_line(x1, y1, x2, y2, width = 10, fill = "yellow")
 
   def drawBuilding(mode, building, canvas):
     (x, y) = building.coordinates
@@ -282,7 +310,7 @@ class MapMode(Mode):
     canvas.create_oval(x-mode.r, y-mode.r, x+mode.r, y+mode.r, fill = "pink")
   
   def drawIcons(mode, canvas):
-    if mode.displayPaths:
+    if mode.displayPaths and (not mode.heroMoving):
       # draw path selection icons:
       (x, y) = (mode.app.hero.coordinates)
       (mode.recPathX1, mode.recPathY2) = (x + mode.width//50, y - mode.height//100) 
