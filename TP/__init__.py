@@ -2,14 +2,14 @@
   # four modes: Login, Dorm, Schedule, Map
   # class Hero
 
-# modes not yet separated into files
-# Map Mode does not work unless copy-paste code from map_ into this file, debug later
+# modes not yet completely separated into files
+  # this file still has Login and Schedule
 
 # loosely adapted from https://www.cs.cmu.edu/~112/notes/notes-animations-part2.html#subclassingModalApp
 
 from cmu_112_graphics import *
-from map_ import *
-from hero import *
+from _map import *
+from dorm import *
 
 class LoginMode(Mode):
 
@@ -49,49 +49,6 @@ class LoginMode(Mode):
           (mode.height/2 + mode.space*2 < event.y < mode.height/2 + mode.space*2 + mode.buttonH)):
       mode.app.quit()
       pass
-
-class DormMode(Mode):
-  def appStarted(mode):
-    mode.background = mode.loadImage('images\dormPic.png')
-    scale = min(mode.width/mode.background.size[0], mode.height/mode.background.size[1])
-    mode.background = mode.scaleImage(mode.background, scale)
-    mode.bedLocation = (mode.width*20/75, mode.height*32/55)
-    mode.windowLocation = (mode.width*7/75, mode.height*9/55)
-    mode.scheLocation = (mode.width*60/75, mode.height*12/55)
-    # hardcode locations for desk and clock
-    mode.r = mode.width/50
-
-  def timerFired(mode):
-    # calculate time
-    # calculate date
-    pass
-
-  def mousePressed(mode, event):
-    if ((mode.windowLocation[0] - mode.r < event.x < mode.windowLocation[0] + mode.r) and
-        (mode.windowLocation[1] - mode.r < event.y < mode.windowLocation[1] + mode.r)):
-       mode.app.setActiveMode(mode.app.mapMode)
-    if ((mode.scheLocation[0] - mode.r < event.x < mode.scheLocation[0] + mode.r) and
-        (mode.scheLocation[1] - mode.r < event.y < mode.scheLocation[1] + mode.r)):
-       mode.app.setActiveMode(mode.app.scheMode)
-    # click on bed to call Hero.sleep()
-    # click on desk to call Hero.study()
-
-  def redrawAll(mode, canvas):
-    canvas.create_image(mode.width/2, mode.height/2, 
-                        image = ImageTk.PhotoImage(mode.background))
-    canvas.create_oval(mode.bedLocation[0] - mode.r, mode.bedLocation[1] - mode.r,
-                       mode.bedLocation[0] + mode.r, mode.bedLocation[1] + mode.r,
-                       fill = "pink")
-    canvas.create_oval(mode.windowLocation[0] - mode.r, mode.windowLocation[1] - mode.r,
-                       mode.windowLocation[0] + mode.r, mode.windowLocation[1] + mode.r,
-                       fill = "pink")
-    canvas.create_oval(mode.scheLocation[0] - mode.r, mode.scheLocation[1] - mode.r,
-                       mode.scheLocation[0] + mode.r, mode.scheLocation[1] + mode.r,
-                       fill = "pink")
-    # draw the interactive point for desk
-    # draw clock with time
-    #canvas.create_text(mode.width/2, mode.height/2, font = "Arial 20 bold",
-                       #text = f"Time: ")
 
 class ScheMode(Mode):
 
@@ -134,64 +91,267 @@ class MyModalApp(ModalApp):
     app.mapMode = MapMode()
     app.setActiveMode(app.loginMode)
     app.timerDelay = 50
-    app.hero = Hero(None, None, 10)
+    app.month = 1 # Jan
+    app.date = 12 # 12th
+    app.day = 7   # Mon
+    (app.hours, app.mins) = (20, 0) # 8:00 pm
+    app.hero = Hero(None, None, 1*app.width/1125)
     app.createGraph()
   
-  def createGraph(mode):
+  def createGraph(app):
     # hardcode the locations -> graph
-    mode.createBuildings()
-    mode.graph = {mode.UC:  {mode.PCA: mode.UC.getDistance(mode.PCA),  
-                             mode.CUT: mode.UC.getDistance(mode.CUT),
-                             mode.TC:  mode.UC.getDistance(mode.TC)},
-                  mode.PCA: {mode.UC:  mode.PCA.getDistance(mode.UC),  
-                             mode.CUT: mode.PCA.getDistance(mode.CUT),
-                             mode.GHC: mode.PCA.getDistance(mode.GHC)},
-                  mode.CUT: {mode.UC:  mode.CUT.getDistance(mode.UC),
-                             mode.PCA: mode.CUT.getDistance(mode.PCA),
-                             mode.TC:  mode.CUT.getDistance(mode.TC),
-                             mode.DH:  mode.CUT.getDistance(mode.DH)},
-                  mode.GHC: {mode.PCA: mode.GHC.getDistance(mode.PCA)},
-                  mode.DH:  {mode.CUT: mode.DH.getDistance(mode.CUT)},
-                  mode.TC:  {mode.UC:  mode.TC.getDistance(mode.UC),
-                             mode.CUT: mode.TC.getDistance(mode.CUT),
-                             mode.DON: mode.TC.getDistance(mode.DON)},
-                  mode.DON: {mode.TC:  mode.DON.getDistance(mode.TC)}}
+    app.createBuildings()
+    app.graph = {app.UC:  {app.WH:  app.UC.getDistance(app.WH),
+                           app.PCA: app.UC.getDistance(app.PCA),  
+                           app.CUT: app.UC.getDistance(app.CUT),
+                           app.TC:  app.UC.getDistance(app.TC),
+                           app.WWG: app.UC.getDistance(app.WWG),
+                           app.GS:  app.UC.getDistance(app.GS)},
+                 app.PCA: {app.UC:  app.PCA.getDistance(app.UC),  
+                           app.CUT: app.PCA.getDistance(app.CUT),
+                           app.GHC: app.PCA.getDistance(app.GHC),
+                           app.WH:  app.PCA.getDistance(app.WH)},
+                 app.CUT: {app.UC:  app.CUT.getDistance(app.UC),
+                           app.PCA: app.CUT.getDistance(app.PCA),
+                           app.FE:  app.CUT.getDistance(app.FE),
+                           app.TC:  app.CUT.getDistance(app.TC),
+                           app.FAL: app.CUT.getDistance(app.FAL)},
+                 app.GHC: {app.PCA: app.GHC.getDistance(app.PCA),
+                           app.NSH: app.GHC.getDistance(app.NSH)},
+                 app.DH:  {app.FE:  app.DH.getDistance(app.FE),
+                           app.MAL: app.DH.getDistance(app.MAL),
+                           app.WEH: app.DH.getDistance(app.WEH)},
+                 app.TC:  {app.UC:  app.TC.getDistance(app.UC),
+                           app.CUT: app.TC.getDistance(app.CUT),
+                           app.FAL: app.TC.getDistance(app.FAL),
+                           app.MM:  app.TC.getDistance(app.MM),
+                           app.WWG: app.TC.getDistance(app.WWG)},
+                 app.DON: {app.MM:  app.DON.getDistance(app.MM),
+                           app.GYM: app.DON.getDistance(app.GYM),
+                           app.HIL: app.DON.getDistance(app.HIL),
+                           app.RES: app.DON.getDistance(app.RES),
+                           app.SF:  app.DON.getDistance(app.SF)},
+                 app.BH:  {app.PH:  app.BH.getDistance(app.PH),
+                           app.MAL: app.BH.getDistance(app.MAL),
+                           app.FE:  app.BH.getDistance(app.FE),
+                           app.HL:  app.BH.getDistance(app.HL)},
+                 app.PH:  {app.HH:  app.PH.getDistance(app.HH),
+                           app.MAL: app.PH.getDistance(app.MAL),
+                           app.BH:  app.PH.getDistance(app.BH),
+                           app.WEH: app.PH.getDistance(app.WEH)},
+                 app.HL:  {app.BH:  app.HL.getDistance(app.BH),
+                           app.FE:  app.HL.getDistance(app.FE),
+                           app.CFA: app.HL.getDistance(app.CFA)},
+                 app.NSH: {app.GHC: app.NSH.getDistance(app.GHC),
+                           app.WEH: app.NSH.getDistance(app.WEH)},
+                 app.WEH: {app.PH:  app.WEH.getDistance(app.PH),
+                           app.MAL: app.WEH.getDistance(app.MAL),
+                           app.DH:  app.WEH.getDistance(app.DH),
+                           app.NSH: app.WEH.getDistance(app.NSH),
+                           app.HH:  app.WEH.getDistance(app.HH)},
+                 app.WWG: {app.UC:  app.WWG.getDistance(app.UC),
+                           app.TC:  app.WWG.getDistance(app.TC),
+                           app.MM:  app.WWG.getDistance(app.MM),
+                           app.RES: app.WWG.getDistance(app.RES),
+                           app.GS:  app.WWG.getDistance(app.GS)},
+                 app.RES: {app.GS:  app.RES.getDistance(app.GS),
+                           app.SF:  app.RES.getDistance(app.SF),
+                           app.HIL: app.RES.getDistance(app.HIL),
+                           app.DON: app.RES.getDistance(app.DON),
+                           app.WWG: app.RES.getDistance(app.WWG)},
+                 app.MM:  {app.DON: app.MM.getDistance(app.DON),
+                           app.DON: app.MM.getDistance(app.WWG),
+                           app.TC:  app.MM.getDistance(app.TC),
+                           app.FAL: app.MM.getDistance(app.FAL),
+                           app.POS: app.MM.getDistance(app.POS),
+                           app.GYM: app.MM.getDistance(app.GYM)},
+                 app.GS:  {app.UC:  app.GS.getDistance(app.UC),
+                           app.WWG: app.GS.getDistance(app.WWG),
+                           app.RES: app.GS.getDistance(app.RES),
+                           app.SF:  app.GS.getDistance(app.SF)},
+                 app.SF:  {app.GS:  app.SF.getDistance(app.GS),
+                           app.RES: app.SF.getDistance(app.RES),
+                           app.HIL: app.SF.getDistance(app.HIL)},
+                 app.HIL: {app.SF:  app.HIL.getDistance(app.SF),
+                           app.RES: app.HIL.getDistance(app.RES),
+                           app.DON: app.HIL.getDistance(app.DON)},
+                 app.GYM: {app.DON: app.GYM.getDistance(app.DON),
+                           app.MM:  app.GYM.getDistance(app.MM),
+                           app.POS: app.GYM.getDistance(app.POS)},
+                 app.POS: {app.CFA: app.POS.getDistance(app.CFA),
+                           app.FAL: app.POS.getDistance(app.FAL),
+                           app.MM:  app.POS.getDistance(app.MM),
+                           app.GYM: app.POS.getDistance(app.GYM)},
+                 app.CFA: {app.FE:  app.CFA.getDistance(app.FE),
+                           app.FAL: app.CFA.getDistance(app.FAL),
+                           app.POS: app.CFA.getDistance(app.POS),
+                           app.HL:  app.CFA.getDistance(app.HL)},
+                 app.FE:  {app.CUT: app.FE.getDistance(app.CUT),
+                           app.MAL: app.FE.getDistance(app.MAL),
+                           app.CFA: app.FE.getDistance(app.CFA),
+                           app.HL:  app.FE.getDistance(app.HL),
+                           app.BH:  app.FE.getDistance(app.BH),
+                           app.DH:  app.FE.getDistance(app.DH),
+                           app.FAL: app.FE.getDistance(app.FAL)},
+                 app.MAL: {app.WEH: app.MAL.getDistance(app.WEH),
+                           app.DH:  app.MAL.getDistance(app.DH),
+                           app.BH:  app.MAL.getDistance(app.BH)},
+                 app.FAL: {app.CUT: app.FAL.getDistance(app.CUT),
+                           app.FE:  app.FAL.getDistance(app.FE),
+                           app.CFA: app.FAL.getDistance(app.CFA),
+                           app.POS: app.FAL.getDistance(app.POS),
+                           app.MM:  app.FAL.getDistance(app.MM),
+                           app.TC:  app.FAL.getDistance(app.TC)},
+                 app.HH:  {app.WEH: app.HH.getDistance(app.WEH),
+                           app.PH:  app.HH.getDistance(app.PH)},
+                 app.WH:  {app.TQ:  app.WH.getDistance(app.TQ),
+                           app.MOR: app.WH.getDistance(app.MOR),
+                           app.UC:  app.WH.getDistance(app.UC),
+                           app.PCA: app.WH.getDistance(app.PCA)},
+                 app.TQ:  {app.TEP: app.TQ.getDistance(app.TEP),
+                           app.MOR: app.TQ.getDistance(app.MOR),
+                           app.WH:  app.TQ.getDistance(app.WH),
+                           app.GHC: app.TQ.getDistance(app.GHC)},
+                 app.TEP: {app.ROF: app.TEP.getDistance(app.ROF),
+                           app.TQ:  app.TEP.getDistance(app.TQ)},
+                 app.MOR: {app.STE: app.MOR.getDistance(app.STE),
+                           app.WH:  app.MOR.getDistance(app.WH),
+                           app.TQ:  app.MOR.getDistance(app.TQ)},
+                 app.STE: {app.MUD: app.STE.getDistance(app.MUD),
+                           app.ROF: app.STE.getDistance(app.ROF),
+                           app.MOR: app.STE.getDistance(app.MOR)},
+                 app.MUD: {app.ROF: app.MUD.getDistance(app.ROF),
+                           app.STE: app.MUD.getDistance(app.STE)},
+                 app.ROF: {app.MUD: app.ROF.getDistance(app.MUD),
+                           app.STE: app.ROF.getDistance(app.STE),
+                           app.TEP: app.ROF.getDistance(app.TEP)}}
 
-  def createBuildings(mode):
-    mode.buildings = set()
+  def createBuildings(app):
+    app.buildings = set()
     
-    mode.UC = Building("UC", "Cohon University Center", 
-                       (mode.width*760/1125, mode.height*510/825))
+    app.UC = Building("UC", "Cohon University Center", 
+                      (app.width*760/1125, app.height*510/825))
     Gallo = DiningPlace("Gallo", "El Gallo de Oro", 
-                        (mode.width*760/1125, mode.height*510/825),
-                        "Dining", 0, mode.UC, [(10, 22)], 0)
+                        (app.width*760/1125, app.height*510/825),
+                        "Dining", 1, app.UC, [(10, 22)], 0)
+    ABP = DiningPlace("ABP", "Au Bon Pain at Skibo Cafe", 
+                      (app.width*760/1125, app.height*510/825),
+                      "Dining", 2, app.UC, [(8, 2)], 2)
 
-    mode.DH = Building("Doherty", "Doherty Hall", 
-                       (mode.width*562/1125, mode.height*598/825))
-    DH2210 = Classroom("DH2210", "DH2210", (mode.width*562/1125, mode.height*598/825),  
-                       "Classroom", 2, mode.DH, [(0, 24)], "15112 Lecture")
+    app.DH = Building("Doherty", "Doherty Hall", 
+                      (app.width*562/1125, app.height*598/825))
+    DH2210 = Classroom("DH2210", "DH2210", (app.width*562/1125, app.height*598/825),  
+                       "Classroom", 2, app.DH, [(0, 24)], "15112 Lecture")
 
-    mode.GHC = Building("Gates", "Gates & Hillman Centers", 
-                        (mode.width*575/1125, mode.height*491/825))
+    app.GHC = Building("Gates", "Gates & Hillman Centers", 
+                       (app.width*561/1125, app.height*523/825))
     CLR = Classroom("Clusters", "Clusters", 
-                    (mode.width*575/1125, mode.height*491/825),
-                    "Classroom", 5, mode.GHC, [(0, 24)], "15112 Lab")
+                    (app.width*561/1125, app.height*523/825),
+                    "Classroom", 5, app.GHC, [(0, 24)], "15112 Lab")
     Rour = DiningPlace("Rour Cafe", "Rour Cafe - Tazza D'Oro",
-                       (mode.width*575/1125, mode.height*491/825), "Dining",
-                       3, mode.GHC, [(0, 24)], 2)
+                       (app.width*561/1125, app.height*523/825), "Dining",
+                       3, app.GHC, [(0, 24)], 2)
 
-    mode.PCA = Building("Purnell Center", "Purnell Center for the Arts",
-                        (mode.width*641/1125, mode.height*510/825))
+    app.PCA = Building("Purnell Center", "Purnell Center for the Arts",
+                       (app.width*641/1125, app.height*532/825))
 
-    mode.DON = Building("Donner", "Donner House", 
-                        (mode.width*892/1125, mode.height*655/825))
-    MyRoom = Place("My Room", "My Room", (mode.width*892/1125, mode.height*655/825),
-                   "Dorm", 1, mode.DON, [(0, 24)])
+    app.DON = Building("Donner", "Donner House", 
+                       (app.width*892/1125, app.height*655/825))
+    MyRoom = InnerPlace("My Room", "My Room", 
+                        (app.width*892/1125, app.height*655/825),
+                        "Dorm", 2, app.DON, [(0, 24)])
 
-    mode.CUT = Building("The Cut", "The Cut", 
-                        (mode.width*661/1125, mode.height*592/825))
+    app.CUT = Building("The Cut", "The Cut", 
+                       (app.width*667/1125, app.height*588/825))
 
-    mode.TC = Building("Tennis Court", "Tennis Court",
-                       (mode.width*754/1125, mode.height*610/825))
+    app.TC = Building("Tennis Court", "Tennis Court",
+                      (app.width*753/1125, app.height*610/825))
+    TennisCourt = InnerPlace("Tennis Court", "Tennis Court",
+                             (app.width*753/1125, app.height*610/825),
+                             "Fitness", 1, app.TC, [(0, 24)])
+
+    app.BH = Building("Baker", "Baker Hall", 
+                      (app.width*533/1125, app.height*696/825))
+    
+    app.PH = Building("Potter", "Potter Hall",
+                      (app.width*443/1125, app.height*672/825))
+    
+    app.HL = Building("Hunt", "Hunt Library",
+                       (app.width*631/1125, app.height*732/825))
+    MaggieMurph = DiningPlace("Maggie Murph", "Maggie Murph Café",
+                              (app.width*631/1125, app.height*732/825), 
+                              "Dining", 1, app.HL, [(8, 22)], 2)                   
+    
+    app.NSH = Building("Newell-Simon", "Newell-Simon Hall",
+                       (app.width*494/1125, app.height*511/825))
+    iNoodle = DiningPlace("iNoodle", "iNoodle",
+                          (app.width*494/1125, app.height*511/825), "Dining",
+                          3, app.NSH, [(10, 20)], 2)
+
+    app.WEH = Building("Wean", "Wean Hall",
+                       (app.width*478/1125, app.height*580/825))
+    LaPrima = DiningPlace("La Prima", "La Prima Espresso",
+                          (app.width*491/1125, app.height*580/825), "Dining",
+                          5, app.WEH, [(8, 18)], 1)
+    
+    app.WWG = Building("West Wing", "West Wing",
+                       (app.width*832/1125, app.height*570/825))
+    
+    app.RES = Building("Resnik", "Resnik House",
+                       (app.width*904/1125, app.height*596/825))
+    
+    app.MM = Building("Margaret Morrison", "Margaret Morrison Carnegie Hall",
+                      (app.width*797/1125, app.height*646/825))
+    
+    app.GS = Building("Gesling Stadium", "Gesling Stadium",
+                      (app.width*887/1125, app.height*530/825))
+    
+    app.SF = Building("Soccer Field", "Intramural Soccer Field",
+                      (app.width*1004/1125, app.height*579/825))
+    
+    app.HIL = Building("The Hill", "The Hill",
+                       (app.width*1000/1125, app.height*674/825))
+
+    app.GYM = Building("Skibo Gymnasium", "Skibo Gymnasium",
+                       (app.width*813/1125, app.height*736/825))
+
+    app.POS = Building("Posner", "Posner Hall",
+                       (app.width*752/1125, app.height*712/825))
+    
+    app.CFA = Building("CFA", "College of Fine Arts",
+                       (app.width*692/1125, app.height*689/825))
+    
+    app.FE = Building("The Fence", "The Fence",
+                      (app.width*652/1125, app.height*634/825))
+    
+    app.MAL = Building("The Mall", "The Mall",
+                       (app.width*537/1125, app.height*648/825))
+    
+    app.FAL = Building("Fine Arts Lot", "Fine Arts Lot",
+                       (app.width*726/1125, app.height*650/825))
+    
+    app.HH = Building("Hamerschlag", "Hamerschlag Hall",
+                      (app.width*413/1125, app.height*611/825))
+    
+    app.WH = Building("Warner", "Warner Hall",
+                      (app.width*659/1125, app.height*431/825))
+
+    app.TQ = Building("Tepper Quad", "Tepper Quad",
+                      (app.width*582/1125, app.height*351/825))
+
+    app.TEP = Building("Tepper", "Tepper Building",
+                       (app.width*533/1125, app.height*321/825))
+
+    app.MOR = Building("Morewood", "Morewood Gardens",
+                       (app.width*674/1125, app.height*319/825))
+
+    app.MUD = Building("Mudge", "Mudge House",
+                       (app.width*699/1125, app.height*168/825))
+
+    app.STE = Building("Stever", "Stever House",
+                       (app.width*710/1125, app.height*228/825))
+
+    app.ROF = Building("Rez", "Residence on the Fifth",
+                       (app.width*409/1125, app.height*172/825))
 
 app = MyModalApp(width=1125, height=825)
