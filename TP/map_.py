@@ -1,6 +1,7 @@
 # Classes and functions to get the Map mode to work:
   # the Location class
   # functions to find paths and move around
+  # functions to do activities in different places
 
 from cmu_112_graphics import *
 
@@ -15,11 +16,11 @@ class Location(object):
     self.coordinates = coordinates # tuple of xy coordinates
   
   def __repr__(self):
-    return f"'{self.shortName}' at {self.coordinates}"
+    return self.shortName
   
   def __eq__(self, other):
     return (isinstance(other, Location) and 
-            (self.shortName == other.shortName) and
+            (self.longName == other.longName) and
             (self.coordinates == other.coordinates))
   
   def __hash__(self):
@@ -33,7 +34,8 @@ class Location(object):
 
 # where the player can click on when interacting with map:
 class Building(Location):
-  filters = ["Dining", "Classroom", "Fitness", "Social", "Dorm"]
+  locationTypes = ["Dining", "Classroom", "Fitness", "Social", "Dorm"]
+  activityTypes = ["Eat", "Attend Class", "Exercise", "Socialize", "Sleep/Study"]
 
   def __init__(self, shortName, longName, coordinates):
     super().__init__(shortName, longName, coordinates)
@@ -76,7 +78,7 @@ class InnerPlace(Location):
   
   # takes a time as number and returns a time of format hh:mm am/pm:
   def getDisplayTime(self, timeNum):
-    hour = 12 if (12 <= timeNum < 13) else int(timeNum % 12)
+    hour = app.hours
     period = "am" if (timeNum // 12 == 0) else "pm"
     minute = str(int((timeNum % 1) * 60))
     if (len(minute) == 1): minute = "0" + minute
@@ -146,43 +148,72 @@ class MapMode(Mode):
     mode.recommendedPath = []
     (mode.recPathX1, mode.recPathX2, mode.recPathY1, mode.recPathY2) = (-1, -1, -1, -1)
     (mode.cusPathX1, mode.cusPathX2, mode.cusPathY1, mode.cusPathY2) = (-1, -1, -1, -1)
-    # hero-movement-related:
+    # hero movement related:
     mode.path = []
     (mode.heroDx, mode.heroDy) = (0, 0)
-    mode.heroMoving = False
     mode.rushing = False
+    mode.exausted = False
+    # hero activity related:
+    mode.preActivity = False
+    mode.activities = [] # tuple of place, function, and displayedText
+    mode.activityButtonLength = mode.width/3
+    mode.activityButtonWidth = mode.app.buttonWidth
+    mode.courseAttended = None
 
   def mousePressed(mode, event):
-    print(f"Mouse pressed at ({event.x}, {event.y}).")
-    if ((mode.dormIconX-mode.iconWidth < event.x < mode.dormIconX+mode.iconWidth) and
-        (mode.dormIconY-mode.iconWidth < event.y < mode.dormIconY+mode.iconWidth) and
-        (mode.app.hero.location == mode.app.DON)):
+    # activity window related:
+    if (mode.preActivity):
+      if mode.app.mousePressedOnExitButton(event): mode.preActivity = False
+      elif mode.mousePressedOnActivityButtons(event):
+        if (mode.activities != [(None, None, "nothing")]):
+          activity = mode.getActivitySelected(event)
+          (place, time) = (activity[0], (mode.app.hours, mode.app.mins))
+          if (place != None):
+            if (place.function != "Classroom"):
+              if (place.isOpen(time)): mode.setActivity(activity)
+            elif (mode.app.isClassTime(time, place)): mode.setActivity(activity)
+    elif (mode.app.hero.inActivity):
+      if (mode.app.mousePressedOnExitButton(event)): mode.app.stopActivity()
+    # icon-related:
+    elif mode.mousePressedOnDormIcon(event):
       mode.app.setActiveMode(mode.app.dormMode)
-    elif ((mode.scheIconX-mode.iconWidth < event.x < mode.scheIconX+mode.iconWidth) and
-          (mode.scheIconY-mode.iconWidth < event.y < mode.scheIconY+mode.iconWidth)):
+    elif mode.mousePressedOnScheIcon(event):
       mode.app.setActiveMode(mode.app.scheMode)
-    elif ((mode.filtIconX-mode.iconWidth < event.x < mode.filtIconX+mode.iconWidth) and
-          (mode.filtIconY-mode.iconWidth < event.y < mode.filtIconY+mode.iconWidth)): 
+    # filter-related:
+    elif mode.mousePressedOnFiltIcon(event): 
       mode.displayFilters = not mode.displayFilters
     elif (mode.displayFilters == True) and (mode.mousePressedOnFilters(event)):
-      print("mouse pressed on filters.")
       mode.mousePressedOnFilter(event)
-    elif (mode.mousePressedOnBuilding(event)): pass
+    # path-realted:
     elif (mode.mousePressedOnPathIcons(event)):
-      mode.heroMoving = True
+      mode.app.hero.moving = True
       mode.app.hero.location = mode.target
       mode.recommendedPath = [mode.app.hero.location]
       mode.nodesSelected = [mode.app.hero.location]
+    elif (mode.mousePressedOnBuilding(event)): pass
+    print(mode.app.hero.sleepy, mode.app.hero.hunger, mode.app.hero.stress)
+
+  def mousePressedOnDormIcon(mode, event):
+    return ((mode.dormIconX-mode.iconWidth < event.x < mode.dormIconX+mode.iconWidth) and
+            (mode.dormIconY-mode.iconWidth < event.y < mode.dormIconY+mode.iconWidth) and
+            (mode.app.hero.location == mode.app.DON))
+
+  def mousePressedOnScheIcon(mode, event):
+    return ((mode.scheIconX-mode.iconWidth < event.x < mode.scheIconX+mode.iconWidth) and
+            (mode.scheIconY-mode.iconWidth < event.y < mode.scheIconY+mode.iconWidth))
+
+  def mousePressedOnFiltIcon(mode, event):
+    return ((mode.filtIconX-mode.iconWidth < event.x < mode.filtIconX+mode.iconWidth) and
+            (mode.filtIconY-mode.iconWidth < event.y < mode.filtIconY+mode.iconWidth))
 
   def mousePressedOnFilters(mode, event):
     (left, right) = (mode.filtRight - mode.filtWidth, mode.filtRight)
-    (top, bottom) = (mode.filtTop, mode.filtTop + mode.filtHeight*len(Building.filters))
+    (top, bottom) = (mode.filtTop, mode.filtTop + mode.filtHeight*len(Building.locationTypes))
     return (left < event.x < right) and (top < event.y < bottom)
 
   def mousePressedOnFilter(mode, event):
     filtIndex = int((event.y - mode.filtTop) / mode.filtHeight)
-    filt = Building.filters[filtIndex]
-    print(f"Mouse pressed on filter {filt}.")
+    filt = Building.locationTypes[filtIndex]
     if (filt in mode.currFilters): mode.currFilters.remove(filt)
     else: mode.currFilters.append(filt)
 
@@ -237,29 +268,67 @@ class MapMode(Mode):
         nearNode = node
     return nearNode
 
+  def mousePressedOnActivityButtons(mode, event):
+    (butLength, butWidth) = (mode.activityButtonLength, mode.activityButtonWidth)
+    blockWidth = (len(mode.activities) + 1.6)*butWidth
+    return ((mode.width/2 - butLength/2 < event.x < mode.width/2 + butLength/2) and
+            (mode.height/4 + 1.6*butWidth < event.y < mode.height/4 + blockWidth))
+
+  def getActivitySelected(mode, event):
+    butWidth = mode.activityButtonWidth
+    blockMargin = (mode.height/4) + (1.6*butWidth)
+    index = int((event.y - blockMargin) / butWidth)
+    print("Activity selected:", mode.activities[index])
+    return mode.activities[index]
+
+  def setActivity(mode, activity):
+    (location, locationType, activityName) = (activity[0], activity[1], activity[2])
+    i = Building.locationTypes.index(locationType)
+    activityType = Building.activityTypes[i]
+    if (activityType == "Eat"): mode.app.hero.eating = True
+    elif (activityType == "Attend Class"):
+      mode.courseAttendedName = location.className
+      for course in mode.app.courses:
+        for clas in course.classes:
+          if (clas.name == mode.courseAttendedName): 
+            mode.courseAttended = course
+            mode.app.hero.inClass = True
+    elif (activityType == "Exercise"): mode.app.hero.exercising = True
+    elif (activityType == "Socialize"): mode.app.hero.socializing = True
+    elif (activityType == "Sleep/Study"): mode.app.setActiveMode(mode.app.dormMode)
+    mode.app.hero.inActivity = True
+
   def mousePressedOnPathIcons(mode, event):
     if ((mode.recPathX1 < event.x < mode.recPathX2) and
         (mode.recPathY1 < event.y < mode.recPathY2)):
       mode.path = mode.recommendedPath
+      mode.activities = []
       return True
     elif ((mode.cusPathX1 < event.x < mode.cusPathX2) and
           (mode.cusPathY1 < event.y < mode.cusPathY2)):
       if (mode.nodesSelected[-1] == mode.target):
         mode.path = mode.nodesSelected
+        mode.activities = []
         return True
       else: 
         mode.nodesSelected = [mode.app.hero.location]
     return False
   
   def timerFired(mode):
-    # moves hero:
+    mode.app.clockTicked()
+    mode.app.adjustHeroStats()
+    mode.app.adjustCourseAchievement()
+    mode.moveHero()
+    mode.adjustRushCapacity()
+    
+  def moveHero(mode):
     if (len(mode.path) > 1):
       mode.getHeroMovement()
       newHeroX = mode.app.hero.coordinates[0] + mode.heroDx
       newHeroY = mode.app.hero.coordinates[1] + mode.heroDy
       mode.app.hero.coordinates = (newHeroX, newHeroY)
-      if (almostEqual(mode.app.hero.coordinates[0], mode.path[1].coordinates[0], 0.8) and
-          almostEqual(mode.app.hero.coordinates[1], mode.path[1].coordinates[1], 0.8)):
+      if (almostEqual(mode.app.hero.coordinates[0], mode.path[1].coordinates[0], 1) and
+          almostEqual(mode.app.hero.coordinates[1], mode.path[1].coordinates[1], 1)):
         mode.path.pop(0)
         mode.app.hero.location = mode.path[0]
         print(f"Hero is now at {mode.app.hero.location}.")
@@ -267,15 +336,11 @@ class MapMode(Mode):
     elif (len(mode.path) == 1): 
       mode.path = []
       mode.displayPaths = False
-      mode.heroMoving = False
-    # adjusts rush capacity:
-    if mode.rushing: 
-      mode.app.hero.rushCapacity -= 1
-      if (mode.app.hero.rushCapacity <= 0): 
-        mode.rushing = False
-        print("Exausted!")
-    elif (mode.app.hero.rushCapacity < mode.app.hero.health):
-      mode.app.hero.rushCapacity += 0.5
+      mode.app.hero.moving = False
+    elif ((len(mode.path) == 0) and (mode.displayPaths == False)):
+      if (mode.activities == []): 
+        mode.getActivities(mode.app.hero.location)
+        mode.preActivity = True
 
   # gets the current, incremental hero movement:
   def getHeroMovement(mode):
@@ -286,6 +351,25 @@ class MapMode(Mode):
     speed = mode.app.hero.speed*1.5 if mode.rushing else mode.app.hero.speed
     (mode.heroDx, mode.heroDy) = (speed*x/h, speed*y/h)
 
+  def getActivities(mode, building):
+    for place in mode.app.hero.location.places:
+      i = Building.locationTypes.index(place.function)
+      activityName = Building.activityTypes[i]
+      activityInfo = f"{activityName} in {place.shortName}"
+      mode.activities.append((place, place.function, activityInfo))
+    if (mode.activities == []): mode.activities = [(None, None, "Nothing")]
+
+  def adjustRushCapacity(mode):
+    if mode.rushing: 
+      mode.app.hero.rushCapacity -= 1
+      if (mode.app.hero.rushCapacity <= 0): 
+        mode.rushing = False
+        mode.exausted = True
+        print("Exausted!")
+    elif (mode.app.hero.rushCapacity < mode.app.hero.health):
+      mode.app.hero.rushCapacity += 0.5
+      mode.exausted = False
+
   def keyPressed(mode, event):
     if (event.key == "r"): mode.rushing = not mode.rushing
 
@@ -294,16 +378,30 @@ class MapMode(Mode):
                         image = ImageTk.PhotoImage(mode.background))
     # will be replaced by icon images:
     mode.drawIcons(canvas)
+    # draw map:
     if mode.displayFilters: mode.drawFilters(canvas)
     if mode.displayPaths: mode.drawPaths(canvas)
     for building in mode.app.graph: mode.drawBuilding(building, canvas)
+    if mode.displayPaths and (not mode.app.hero.moving): mode.drawPathIcons(canvas)
     mode.drawHero(canvas)
-    mode.drawPathIcons(canvas)
+    # draw activity-selection window:
+    if mode.preActivity: mode.drawPreActivityWindow(canvas)
+    # draw activity window:
+    if mode.app.hero.eating:
+      mode.app.drawActivityWindow("Eating", mode.app.hero.hunger, canvas)
+    elif mode.app.hero.socializing:
+      mode.app.drawActivityWindow("Socializing", mode.app.hero.stress, canvas)
+    elif mode.app.hero.exercising:
+      mode.app.drawActivityWindow("Exercising", mode.app.hero.stress, canvas)
+    elif mode.app.hero.inClass:
+      activity = f"Taking {mode.courseAttendedName}"
+      mode.app.drawActivityWindow(activity, mode.courseAttended.achieve, canvas)
+    mode.app.drawDateAndTime(canvas)
 
   def drawIcons(mode, canvas):
     canvas.create_rectangle(mode.dormIconX-mode.iconWidth, mode.dormIconY-mode.iconWidth,
                             mode.dormIconX+mode.iconWidth, mode.dormIconY+mode.iconWidth, 
-                            fill = "pink")
+                            fill = "pink" if (mode.app.hero.location == mode.app.DON) else "gray")
     canvas.create_rectangle(mode.scheIconX-mode.iconWidth, mode.scheIconY-mode.iconWidth,
                             mode.scheIconX+mode.iconWidth, mode.scheIconY+mode.iconWidth, 
                             fill = "cyan")
@@ -316,8 +414,8 @@ class MapMode(Mode):
     mode.filtTop = mode.filtIconY + mode.iconWidth
     mode.filtWidth = mode.width//9.5
     mode.filtHeight = mode.height//20
-    for i in range(len(Building.filters)):
-      filt = Building.filters[i]
+    for i in range(len(Building.locationTypes)):
+      filt = Building.locationTypes[i]
       color = "cyan" if (filt in mode.currFilters) else "white"
       canvas.create_rectangle(mode.filtRight - mode.filtWidth, mode.filtTop + i*mode.filtHeight,
                               mode.filtRight, mode.filtTop + (i+1)*mode.filtHeight, 
@@ -326,7 +424,7 @@ class MapMode(Mode):
                          text = filt, font = "Arial 16 bold")
 
   def drawPaths(mode, canvas):
-    if not mode.heroMoving:
+    if not mode.app.hero.moving:
       for nodeA in mode.app.graph:
         (x1, y1) = nodeA.coordinates
         for nodeB in mode.app.graph[nodeA]:
@@ -360,31 +458,67 @@ class MapMode(Mode):
     canvas.create_oval(x-mode.r, y-mode.r, x+mode.r, y+mode.r, fill = "pink")
   
   def drawPathIcons(mode, canvas):
-    if mode.displayPaths and (not mode.heroMoving):
-      (x, y) = (mode.app.hero.coordinates)
-      if (mode.target.coordinates[0] <= mode.app.hero.coordinates[0]):
-        (mode.recPathX1, mode.cusPathX1) = (x + mode.width // 50, x + mode.width // 50)
-        (mode.recPathX2, mode.cusPathX2) = (mode.recPathX1 + mode.width//10, 
-                                            mode.cusPathX1 + mode.width//10)
-      else:
-        (mode.recPathX2, mode.cusPathX2) = (x - mode.width // 50, x - mode.width // 50)
-        (mode.recPathX1, mode.cusPathX1) = (mode.recPathX2 - mode.width//10, 
-                                            mode.cusPathX2 - mode.width//10)
-      # draw recommended icon:
-      (mode.recPathY2, mode.recPathY1) = (y - mode.height//100, 
-                                          mode.recPathY2 - mode.height//20) 
-      canvas.create_rectangle(mode.recPathX1, mode.recPathY1, mode.recPathX2, 
-                              mode.recPathY2, fill = "white")
-      canvas.create_text((mode.recPathX1+mode.recPathX2)/2, 
-                         (mode.recPathY1+mode.recPathY2)/2, 
-                        text = "Recommended", fill = "green")
-      # draw custom icon:
-      (mode.cusPathY1, mode.cusPathY2) = (y + mode.height//100, 
-                                          mode.cusPathY1 + mode.height//20)
-      canvas.create_rectangle(mode.cusPathX1, mode.cusPathY1, mode.cusPathX2, 
-                              mode.cusPathY2, fill = "white")
-      canvas.create_text((mode.cusPathX1+mode.cusPathX2)/2, 
-                         (mode.cusPathY1+mode.cusPathY2)/2, 
-                         text = "Custom", fill = "red")
+    (x, y) = (mode.app.hero.coordinates)
+    if (mode.target.coordinates[0] <= mode.app.hero.coordinates[0]):
+      (mode.recPathX1, mode.cusPathX1) = (x + mode.width // 50, x + mode.width // 50)
+      (mode.recPathX2, mode.cusPathX2) = (mode.recPathX1 + mode.width//10, 
+                                          mode.cusPathX1 + mode.width//10)
+    else:
+      (mode.recPathX2, mode.cusPathX2) = (x - mode.width // 50, x - mode.width // 50)
+      (mode.recPathX1, mode.cusPathX1) = (mode.recPathX2 - mode.width//10, 
+                                          mode.cusPathX2 - mode.width//10)
+    # draw recommended icon:
+    (mode.recPathY2, mode.recPathY1) = (y - mode.height//100, 
+                                        mode.recPathY2 - mode.height//20) 
+    canvas.create_rectangle(mode.recPathX1, mode.recPathY1, mode.recPathX2, 
+                            mode.recPathY2, fill = "white")
+    canvas.create_text((mode.recPathX1+mode.recPathX2)/2, 
+                        (mode.recPathY1+mode.recPathY2)/2, 
+                      text = "Recommended", fill = "green")
+    # draw custom icon:
+    (mode.cusPathY1, mode.cusPathY2) = (y + mode.height//100, 
+                                        mode.cusPathY1 + mode.height//20)
+    canvas.create_rectangle(mode.cusPathX1, mode.cusPathY1, mode.cusPathX2, 
+                            mode.cusPathY2, fill = "white")
+    canvas.create_text((mode.cusPathX1+mode.cusPathX2)/2, 
+                        (mode.cusPathY1+mode.cusPathY2)/2, 
+                        text = "Custom", fill = "red")
+
+  def drawPreActivityWindow(mode, canvas):
+    # draw the window:
+    (borderX, borderY) = (mode.app.windowBorderX, mode.app.windowBorderY)
+    canvas.create_rectangle(borderX, borderY, mode.app.width-borderX, mode.app.height-borderY,
+                            fill = "white", width = 0)
+    # draw the activities:
+    for i in range(len(mode.activities)): mode.drawActivityButton(i, canvas)
+    # draw the prompt:
+    (butLength, butWidth) = (mode.app.buttonLength, mode.app.buttonWidth)
+    canvas.create_text(mode.app.width/2, mode.app.height/4 + butWidth/2,
+                       text = f"Things to do in {mode.app.hero.location.shortName}:",
+                       font = "Arial 24 bold")
+    # draw exit button:
+    canvas.create_rectangle(mode.app.width/2 - butLength/2, mode.app.height*(3/4) - butWidth,
+                            mode.app.width/2 + butLength/2, mode.app.height*(3/4),
+                            fill = "cyan")
+    canvas.create_text(mode.app.width/2, mode.app.height*(3/4) - butWidth/2,
+                       text = "Exit", font = "Arial 20 bold")
+
+  def drawActivityButton(mode, i, canvas):
+    (butLength, butWidth) = (mode.activityButtonLength, mode.activityButtonWidth)
+    distance = (i+1.6)*butWidth
+    x1 = mode.width/2 - butLength/2
+    x2 = mode.width/2 + butLength/2
+    y1 = mode.height/4 + distance
+    y2 = mode.height/4 + distance + butWidth
+    time = (mode.app.hours, mode.app.mins)
+    activityPlace = mode.activities[i][0]
+    color = "gray"
+    if (activityPlace != None):
+      if (activityPlace.function != "Classroom"):
+        if (activityPlace.isOpen(time)): color = "cyan"
+      elif (mode.app.isClassTime(time, activityPlace)): color = "cyan"
+    canvas.create_rectangle(x1, y1, x2, y2, fill = color)
+    canvas.create_text(mode.width/2, (y1+y2)/2, text = mode.activities[i][2],
+                       font = "Arial 18 bold")
 
 print("Loaded _map")
